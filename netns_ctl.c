@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -11,6 +12,11 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <fcntl.h>
+
+#include "netns_ctlproto.h"
+
+extern int safe_read(int fd, void *buf, size_t len);
+extern void safe_write(int fd, void *buf, size_t len);
 
 int ctl_open(const char *ns)
 {
@@ -43,14 +49,90 @@ int ctl_open(const char *ns)
 	return sock;
 }
 
+void ctl_socket(int sock)
+{
+	int32_t af = -1, type = -1, proto = -1;
+	int rsock;
+	int32_t err;
+
+	if (safe_read(sock, &af, sizeof(af))
+		|| safe_read(sock, &type, sizeof(type))
+		|| safe_read(sock, &proto, sizeof(proto)))
+		return;
+
+	rsock = socket(af, type, proto);
+	if (rsock == -1) {
+		err = errno;
+		safe_write(sock, &err, sizeof(err));
+	} else {
+		struct msghdr msg;
+		struct iovec iov;
+		struct cmsghdr *cmsg;
+		int *ptr;
+		char buf[CMSG_SPACE(sizeof(int))];
+
+		err = 0;
+		iov.iov_base = &err;
+		iov.iov_len = sizeof(err);
+
+		memset(&msg, 0, sizeof(msg));
+
+		msg.msg_control = buf;
+		msg.msg_controllen = sizeof buf;
+		cmsg = CMSG_FIRSTHDR(&msg);
+		cmsg->cmsg_level = SOL_SOCKET;
+		cmsg->cmsg_type = SCM_RIGHTS;
+
+		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+		ptr = (int *) CMSG_DATA(cmsg);
+		*ptr = rsock;
+
+		msg.msg_controllen = cmsg->cmsg_len;
+		msg.msg_iov = &iov;
+		msg.msg_iovlen = 1;
+	}
+}
+
+void ctl_child(int sock)
+{
+	uint8_t cmd;
+	ssize_t nread;
+
+	while ((nread = read(sock, &cmd, 1)) == 0)
+		;
+	if (nread < 0)
+		return;
+
+	switch (cmd) {
+	case NETNS_CMD_NOOP:
+		safe_write(sock, &cmd, 1);
+		return;
+	case NETNS_CMD_SOCKET:
+		ctl_socket(sock);
+		return;
+	}
+}
+
 void ctl_run(int ctlsock)
 {
 	int cfd;
 
+	if (ctlsock < 0)
+		return;
 	do {
 		errno = 0;
 		while ((cfd = accept(ctlsock, NULL, 0)) >= 0) {
-			close(cfd);
+			pid_t pid = fork();
+			if (pid < 0)
+				close(cfd);
+			if (pid == 0) {
+				close(ctlsock);
+				ctl_child(cfd);
+				close(cfd);
+				exit(0);
+			}
+			if (pid > 0)
+				close(cfd);
 		}
 	} while (errno == 0 || errno == EAGAIN || errno == EINTR);
 }

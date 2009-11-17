@@ -1,0 +1,10 @@
+#ifndef _NETNS_CTLPROTO_H
+#define _NETNS_CTLPROTO_H
+
+enum {
+	NETNS_CMD_NOOP = 0,
+	NETNS_CMD_SOCKET = 1,
+	NETNS_CMD_EXEC = 2,
+};
+
+#endif /* _NETNS_CTLPROTO_H */

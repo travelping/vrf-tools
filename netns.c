@@ -35,7 +35,7 @@ extern void ctl_run(int ctlsock);
 
 static int verbose = 0;
 
-static void safe_write(int fd, void *buf, size_t len)
+void safe_write(int fd, void *buf, size_t len)
 {
 	ssize_t written;
 	char *ptr = buf;
@@ -56,7 +56,7 @@ static void safe_write(int fd, void *buf, size_t len)
 		perror("write");
 }
 
-static void safe_read(int fd, void *buf, size_t len)
+int safe_read(int fd, void *buf, size_t len)
 {
 	ssize_t nread;
 	char *ptr = buf;
@@ -67,14 +67,13 @@ static void safe_read(int fd, void *buf, size_t len)
 			if (errno == EAGAIN)
 				continue;
 			else
-				break;
+				return -1;
 		}
 		ptr += nread;
 		len -= nread;
 	} while (len > 0);
 
-	if (nread < 0)
-		perror("write");
+	return 0;
 }
 
 static int usage(int rv)
