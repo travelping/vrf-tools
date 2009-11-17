@@ -30,6 +30,9 @@
 #error define PATH_STATE
 #endif
 
+extern int ctl_open(const char *ns);
+extern void ctl_run(int ctlsock);
+
 static int verbose = 0;
 
 static void safe_write(int fd, void *buf, size_t len)
@@ -157,7 +160,7 @@ static int writepid(const char *ns)
 
 static int do_start_child(const char *ns, int notifier, int waiter)
 {
-	int ok = 0, rv;
+	int ok = 0, rv, ctlsock;
 	struct pollfd p;
 
 	char exe[256], argv0[256], *args[] = { argv0, NULL };
@@ -172,6 +175,7 @@ static int do_start_child(const char *ns, int notifier, int waiter)
 		safe_write(notifier, &rv, sizeof(rv));
 		return 1;
 	}
+	ctlsock = ctl_open(ns);
 
 	if (unshare(CLONE_NEWNET | CLONE_NEWUTS) == -1) {
 		perror("unshare");
@@ -219,7 +223,9 @@ static int do_start_child(const char *ns, int notifier, int waiter)
 	close(1);
 	close(2);
 
-	/* just wait forever... */
+	ctl_run(ctlsock);
+
+	/* hmm. control socket bailed, just wait forever... */
 	sigemptyset(&set);
 	sigaddset(&set, SIGCHLD);
 	while (1)
