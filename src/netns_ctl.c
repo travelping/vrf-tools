@@ -47,19 +47,11 @@ int ctl_open(const char *ns)
 	return sock;
 }
 
-static void ctl_socket(int sock)
+static void ctl_pushfd(int sock, int fd)
 {
-	int32_t af = -1, type = -1, proto = -1;
-	int rsock;
 	int32_t err;
 
-	if (safe_read(sock, &af, sizeof(af))
-		|| safe_read(sock, &type, sizeof(type))
-		|| safe_read(sock, &proto, sizeof(proto)))
-		return;
-
-	rsock = socket(af, type, proto);
-	if (rsock == -1) {
+	if (fd == -1) {
 		err = errno;
 		safe_write(sock, &err, sizeof(err));
 	} else {
@@ -83,15 +75,29 @@ static void ctl_socket(int sock)
 
 		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
 		ptr = (int *) CMSG_DATA(cmsg);
-		*ptr = rsock;
+		*ptr = fd;
 
 		msg.msg_controllen = cmsg->cmsg_len;
 		msg.msg_iov = &iov;
 		msg.msg_iovlen = 1;
 		sendmsg(sock, &msg, 0);
 
-		close(rsock);
+		close(fd);
 	}
+}
+
+static void ctl_socket(int sock)
+{
+	int32_t af = -1, type = -1, proto = -1;
+	int rsock;
+
+	if (safe_read(sock, &af, sizeof(af))
+		|| safe_read(sock, &type, sizeof(type))
+		|| safe_read(sock, &proto, sizeof(proto)))
+		return;
+
+	rsock = socket(af, type, proto);
+	ctl_pushfd(sock, rsock);
 }
 
 static void ctl_child(int sock)
