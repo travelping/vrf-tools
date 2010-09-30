@@ -14,9 +14,7 @@
 #include <fcntl.h>
 
 #include "netns_ctlproto.h"
-
-extern int safe_read(int fd, void *buf, size_t len);
-extern void safe_write(int fd, void *buf, size_t len);
+#include "netns.h"
 
 int ctl_open(const char *ns)
 {
@@ -49,7 +47,7 @@ int ctl_open(const char *ns)
 	return sock;
 }
 
-void ctl_socket(int sock)
+static void ctl_socket(int sock)
 {
 	int32_t af = -1, type = -1, proto = -1;
 	int rsock;
@@ -96,7 +94,7 @@ void ctl_socket(int sock)
 	}
 }
 
-void ctl_child(int sock)
+static void ctl_child(int sock)
 {
 	uint8_t cmd;
 	ssize_t nread;

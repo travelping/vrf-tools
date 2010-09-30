@@ -30,51 +30,9 @@
 #error define PATH_STATE
 #endif
 
-extern int ctl_open(const char *ns);
-extern void ctl_run(int ctlsock);
+#include "netns.h"
 
 static int verbose = 0;
-
-void safe_write(int fd, void *buf, size_t len)
-{
-	ssize_t written;
-	char *ptr = buf;
-
-	do {
-		written = write(fd, ptr, len);
-		if (written < 0) {
-			if (errno == EAGAIN)
-				continue;
-			else
-				break;
-		}
-		ptr += written;
-		len -= written;
-	} while (len > 0);
-
-	if (written < 0)
-		perror("write");
-}
-
-int safe_read(int fd, void *buf, size_t len)
-{
-	ssize_t nread;
-	char *ptr = buf;
-
-	do {
-		nread = read(fd, ptr, len);
-		if (nread < 0) {
-			if (errno == EAGAIN)
-				continue;
-			else
-				return -1;
-		}
-		ptr += nread;
-		len -= nread;
-	} while (len > 0);
-
-	return 0;
-}
 
 static int usage(int rv)
 {
