@@ -77,10 +77,12 @@ static int launch_cmd(const char *exe, char * const *args)
 }
 
 static char pidpath[PATH_MAX];
+static pid_t mainpid;
 
 static void removepid()
 {
-	unlink(pidpath);
+	if (getpid() == mainpid)
+		unlink(pidpath);
 }
 
 static int writepid(const char *ns)
@@ -96,7 +98,8 @@ static int writepid(const char *ns)
 		return 1;
 	}
 
-	snprintf(pid, sizeof(pid), "%ld\n", (long)getpid());
+	mainpid = getpid();
+	snprintf(pid, sizeof(pid), "%ld\n", (long)mainpid);
 	safe_write(pidfd, pid, strlen(pid));
 
 	lck.l_type = F_WRLCK;
