@@ -100,6 +100,14 @@ static void ctl_socket(int sock)
 	ctl_pushfd(sock, rsock);
 }
 
+static void ctl_tap(int sock)
+{
+	int tap;
+
+	tap = open("/dev/net/tun", O_RDWR);
+	ctl_pushfd(sock, tap);
+}
+
 static void ctl_child(int sock)
 {
 	uint8_t cmd;
@@ -116,6 +124,9 @@ static void ctl_child(int sock)
 		return;
 	case NETNS_CMD_SOCKET:
 		ctl_socket(sock);
+		return;
+	case NETNS_CMD_TAP:
+		ctl_tap(sock);
 		return;
 	}
 }

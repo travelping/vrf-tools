@@ -4,7 +4,8 @@
 enum {
 	NETNS_CMD_NOOP = 0,
 	NETNS_CMD_SOCKET = 1,
-	NETNS_CMD_EXEC = 2,
+	NETNS_CMD_TAP = 2,
+	NETNS_CMD_EXEC = 3,
 };
 
 #endif /* _NETNS_CTLPROTO_H */
