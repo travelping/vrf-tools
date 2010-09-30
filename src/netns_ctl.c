@@ -90,6 +90,9 @@ void ctl_socket(int sock)
 		msg.msg_controllen = cmsg->cmsg_len;
 		msg.msg_iov = &iov;
 		msg.msg_iovlen = 1;
+		sendmsg(sock, &msg, 0);
+
+		close(rsock);
 	}
 }
 
