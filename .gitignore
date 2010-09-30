@@ -20,5 +20,5 @@ gmon.out
 .deps
 .libs
 
-/netns
+/src/netns
 
