@@ -56,5 +56,5 @@ ${sched_h}
 ${linux_unistd_h}
 ]])
 
-AC_OUTPUT([Makefile])
+AC_OUTPUT([Makefile doc/Makefile])
 

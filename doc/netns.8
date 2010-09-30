@@ -1,0 +1,80 @@
+.TH NETNS 8
+.SH NAME
+netns \- sets up and configures a new network namespace
+.SH SYNOPSIS
+.B netns [-hv] start|getpid 
+.I NAMESPACE
+.SH DESCRIPTION
+.B netns
+is usually used to initialize network (and UTS) namespaces. It executes two
+scripts; 'assign' is executed in the original namespace while 'start' is
+executed in the newly created namespace.  
+.SH OPTIONS
+.IP -v
+Enable verbose output
+.IP start
+Start the namespace specified with
+.I NAMESPACE
+.IP getpid
+Prints the namespace pid of a running namespace
+.IP -h
+Outputs usage information
+.SH FILES
+.I /etc/netns/NAMESPACE
+.RS
+The directory containing all configuration of a single namespace
+.RE
+.I /etc/netns/NAMESPACE/assign
+.RS
+Contains the host system part of the setup procedures
+.RE
+.I /etc/netns/NAMESPACE/start
+.RS
+Contains the child namespace part of the setup procedures
+.RE
+.SH ENVIRONMENT
+
+.IP NETNS_NAME
+The ASCII name of the namespace
+.IP NETNS_PID
+The process ID of the newly spawned namespace
+.SH EXAMPLE
+The following example demonstrates the use of 
+.BR netns
+to spawn a fairly basic network namespace. 
+.SS Assign script
+\&
+.nf
+#! /bin/sh
+ip link add name veth0 type veth peer name veth.netns
+ip link set veth0 netns $NETNS_PID
+ip addr add 172.22.22.1/30 dev veth.netns scope link
+ip link set veth.netns up
+.fi
+.SS Start script
+\&
+.nf
+#! /bin/sh
+hostname foo-netns
+ip link set lo up
+ip addr add 172.22.22.2/30 dev veth0
+ip link set veth0 up
+screen -d -m
+.fi
+
+After starting the netns there should be a detached screen session you can
+attach to for further configuration. A lightweight, init-like system that
+could be used for starting processes is
+.BR runsvdir (2)
+included in runit.
+.SH BUGS
+TBD. The software itself should be more or less free of bugs as it is fairly
+simple. Most problems encountered are caused by using older kernel versions.
+Almost all bugs with regard to network namespaces should be fixed in 2.6.35.
+.SH AUTHOR
+netns was written by Daniel Lamparter <equinox at diac24 dot net>
+
+This man page was written by Benjamin Kiessling <benjaminkiessling at bttec dot org>
+.SH "SEE ALSO"
+.BR clone (2)
+
