@@ -1,5 +1,5 @@
 AC_PREREQ(2.57)
-AC_INIT(netns-tools, 0.1)
+AC_INIT(netns-tools, 0.1.99)
 AC_CONFIG_AUX_DIR(ac)
 AM_INIT_AUTOMAKE
 AC_CONFIG_HEADER([acconf.h])
