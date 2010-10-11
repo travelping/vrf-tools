@@ -3,5 +3,6 @@ AM_CFLAGS = -I..
 
 include_HEADERS = netns.h
 lib_LTLIBRARIES = libnetns.la
-libnetns_la_SOURCES = netns_dummy.c
+libnetns_la_SOURCES = netns_kernel.c
+extra_SOURCES = netns_dummy.c
 
