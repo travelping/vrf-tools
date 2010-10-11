@@ -55,6 +55,7 @@ static int enter_netns(const char *netns)
 
 	sys_setns(0, new);
 	close(new);
+	return old;
 }
 
 static void leave_netns(int old)
