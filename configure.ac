@@ -11,6 +11,7 @@ AC_C_CONST
 AC_C_INLINE
 
 AC_PROG_INSTALL
+AC_PROG_LIBTOOL
 
 AC_CPP_PRAGMA_ONCE
 AC_C_FLAG([-Wall])
@@ -59,6 +60,7 @@ ${linux_unistd_h}
 AC_OUTPUT([
 	Makefile
 	src/Makefile
+	lib/Makefile
 	doc/Makefile
 ])
 
