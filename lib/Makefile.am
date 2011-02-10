@@ -1,8 +1,8 @@
 DEFS = -DPATH_CFG=\"$(sysconfdir)\" -DPATH_STATE=\"$(localstatedir)\"
 AM_CFLAGS = -I..
 
-include_HEADERS = netns.h
-lib_LTLIBRARIES = libnetns.la
-libnetns_la_SOURCES = netns_kernel.c
-extra_SOURCES = netns_dummy.c
+include_HEADERS = vrf.h
+lib_LTLIBRARIES = libvrf.la
+libvrf_la_SOURCES = vrf_kernel_setns.c
+extra_SOURCES = vrf_dummy.c
 

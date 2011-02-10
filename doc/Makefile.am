@@ -1,2 +1,2 @@
-man8_MANS = netns.8
+man8_MANS = vrf.8
 

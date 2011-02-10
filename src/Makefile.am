@@ -1,6 +1,6 @@
 DEFS = -DPATH_CFG=\"$(sysconfdir)\" -DPATH_STATE=\"$(localstatedir)\"
 AM_CFLAGS = -I..
 
-bin_PROGRAMS = netns
-netns_SOURCES = helpers.c netns.c netns_ctl.c
+bin_PROGRAMS = vrf
+vrf_SOURCES = helpers.c vrf.c vrf_ctl.c
 

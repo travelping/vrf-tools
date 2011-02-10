@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-#include "netns.h"
+#include "vrf_app.h"
 
 void safe_write(int fd, void *buf, size_t len)
 {

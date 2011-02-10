@@ -13,10 +13,10 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "netns_ctlproto.h"
-#include "netns.h"
+#include "vrf_ctlproto.h"
+#include "vrf_app.h"
 
-int ctl_open(const char *ns)
+int ctl_open(const char *vrf)
 {
 	struct sockaddr_un addr;
 	int sock;
@@ -29,7 +29,7 @@ int ctl_open(const char *ns)
 	}
 
 	addr.sun_family = AF_UNIX;
-	snprintf(addr.sun_path, sizeof(addr.sun_path), PATH_STATE"/%s/ctl", ns);
+	snprintf(addr.sun_path, sizeof(addr.sun_path), PATH_STATE"/%s/ctl", vrf);
 	unlink(addr.sun_path);
 	if (bind(sock, (struct sockaddr *)&addr, sizeof(addr))) {
 		fprintf(stderr, "error binding unix control socket to '%s': %s\n",
@@ -119,13 +119,13 @@ static void ctl_child(int sock)
 		return;
 
 	switch (cmd) {
-	case NETNS_CMD_NOOP:
+	case VRF_CMD_NOOP:
 		safe_write(sock, &cmd, 1);
 		return;
-	case NETNS_CMD_SOCKET:
+	case VRF_CMD_SOCKET:
 		ctl_socket(sock);
 		return;
-	case NETNS_CMD_TAP:
+	case VRF_CMD_TAP:
 		ctl_tap(sock);
 		return;
 	}

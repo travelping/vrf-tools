@@ -30,7 +30,7 @@
 #error define PATH_STATE
 #endif
 
-#include "netns.h"
+#include "vrf_app.h"
 
 static int verbose = 0;
 
@@ -38,8 +38,8 @@ static int usage(int rv)
 {
 	FILE *fd = rv ? stderr : stdout;
 	fprintf(fd, "\
-Usage:	netns -h\n\
-	netns [-v] <OPERATION> <NAMESPACE NAME>\n\n\
+Usage:	vrf -h\n\
+	vrf [-v] <OPERATION> <NAMESPACE NAME>\n\n\
 where OPERATION can be:\n\
 	start		start the namespace\n\
 	getpid		print the namespace pid if it is running\n\
@@ -85,13 +85,13 @@ static void removepid()
 		unlink(pidpath);
 }
 
-static int writepid(const char *ns)
+static int writepid(const char *vrf)
 {
 	char pid[32];
 	int pidfd;
 	struct flock lck;
 
-	snprintf(pidpath, sizeof(pidpath), PATH_STATE"/%s/pid", ns);
+	snprintf(pidpath, sizeof(pidpath), PATH_STATE"/%s/pid", vrf);
 	pidfd = open(pidpath, O_RDWR | O_NONBLOCK | O_TRUNC | O_CREAT, 0644);
 	if (pidfd < 0) {
 		fprintf(stderr, "%s: %s\n", pidpath, strerror(errno));
@@ -118,7 +118,7 @@ static int writepid(const char *ns)
 	return 0;
 }
 
-static int do_start_child(const char *ns, int notifier, int waiter)
+static int do_start_child(const char *vrf, int notifier, int waiter)
 {
 	int ok = 0, rv, ctlsock;
 	struct pollfd p;
@@ -130,12 +130,12 @@ static int do_start_child(const char *ns, int notifier, int waiter)
 
 	/* write pid first to catch errors */
 
-	rv = writepid(ns);
+	rv = writepid(vrf);
 	if (rv) {
 		safe_write(notifier, &rv, sizeof(rv));
 		return 1;
 	}
-	ctlsock = ctl_open(ns);
+	ctlsock = ctl_open(vrf);
 
 	if (unshare(CLONE_NEWNET | CLONE_NEWUTS) == -1) {
 		perror("unshare");
@@ -144,11 +144,11 @@ static int do_start_child(const char *ns, int notifier, int waiter)
 		return 1;
 	}
 	if (verbose >= 1)
-		fprintf(stderr, "%s: pid %ld\n", ns, (long)getpid());
+		fprintf(stderr, "%s: pid %ld\n", vrf, (long)getpid());
 
 	safe_write(notifier, &ok, sizeof(ok));
 
-	/* master now runs /etc/netns/(ns)/assign */
+	/* master now runs /etc/vrf/(name)/assign */
 
 	p.fd = waiter;
 	p.events = POLLIN;
@@ -164,8 +164,8 @@ static int do_start_child(const char *ns, int notifier, int waiter)
 
 	setsid();
 
-	snprintf(argv0, sizeof(argv0), "netns: %s", ns);
-	snprintf(exe, sizeof(exe), PATH_CFG "/%s/start", ns);
+	snprintf(argv0, sizeof(argv0), "vrf: %s", vrf);
+	snprintf(exe, sizeof(exe), PATH_CFG "/%s/start", vrf);
 	rv = launch_cmd(exe, args);
 	if (rv) {
 		fprintf(stderr, "%s exited with status %d\n", exe, rv);
@@ -174,7 +174,7 @@ static int do_start_child(const char *ns, int notifier, int waiter)
 	}
 
 	if (verbose >= 1)
-		fprintf(stderr, "%s: up and running\n", ns);
+		fprintf(stderr, "%s: up and running\n", vrf);
 
 	safe_write(notifier, &ok, sizeof(ok));
 	close(notifier);
@@ -192,7 +192,7 @@ static int do_start_child(const char *ns, int notifier, int waiter)
 		sigwait(&set, &sig);
 }
 
-static int do_start_parent(const char *ns, int waiter, int notifier, int pid)
+static int do_start_parent(const char *vrf, int waiter, int notifier, int pid)
 {
 	int status = -1, ok = 0;
 	char spid[10];
@@ -201,8 +201,8 @@ static int do_start_parent(const char *ns, int waiter, int notifier, int pid)
 	char exe[256], argv0[256], *args[] = { argv0, NULL };
 
 	snprintf(spid, sizeof(spid), "%d", pid);
-	setenv("NETNS_PID", spid, 1);
-	setenv("NETNS_NAME", ns, 1);
+	setenv("VRF_PID", spid, 1);
+	setenv("VRF_NAME", vrf, 1);
 
 	/* child does unshare() */
 
@@ -218,8 +218,8 @@ static int do_start_parent(const char *ns, int waiter, int notifier, int pid)
 		return 1;
 	}
 
-	snprintf(argv0, sizeof(argv0), "netns-assign: %s", ns);
-	snprintf(exe, sizeof(exe), PATH_CFG "/%s/assign", ns);
+	snprintf(argv0, sizeof(argv0), "vrf-assign: %s", vrf);
+	snprintf(exe, sizeof(exe), PATH_CFG "/%s/assign", vrf);
 	status = launch_cmd(exe, args);
 	if (status) {
 		fprintf(stderr, "%s exited with status %d\n", exe, status);
@@ -241,7 +241,7 @@ static int do_start_parent(const char *ns, int waiter, int notifier, int pid)
 	return 0;
 }
 
-static int do_start(const char *ns)
+static int do_start(const char *vrf)
 {
 	pid_t pid;
 	int sync1[2], sync2[2];
@@ -259,20 +259,20 @@ static int do_start(const char *ns)
 	case 0:
 		close(sync1[0]);
 		close(sync2[1]);
-		return do_start_child(ns, sync1[1], sync2[0]);
+		return do_start_child(vrf, sync1[1], sync2[0]);
 	default:
 		close(sync1[1]);
 		close(sync2[0]);
-		return do_start_parent(ns, sync1[0], sync2[1], pid);
+		return do_start_parent(vrf, sync1[0], sync2[1], pid);
 	}
 }
 
-static int do_getpid(const char *ns)
+static int do_getpid(const char *vrf)
 {
 	int pidfd;
 	struct flock lck;
 
-	snprintf(pidpath, sizeof(pidpath), PATH_STATE"/%s/pid", ns);
+	snprintf(pidpath, sizeof(pidpath), PATH_STATE"/%s/pid", vrf);
 	pidfd = open(pidpath, O_RDWR | O_NONBLOCK);
 	if (pidfd < 0) {
 		fprintf(stderr, "%s: %s\n", pidpath, strerror(errno));
@@ -294,16 +294,16 @@ static int do_getpid(const char *ns)
 		printf("%d", lck.l_pid);
 		return 0;
 	}
-	fprintf(stderr, "%s: not running (pid file not locked)\n", ns);
+	fprintf(stderr, "%s: not running (pid file not locked)\n", vrf);
 	return 2;
 }
 
 int main(int argc, char * const argv[])
 {
 	int c;
-	const char *cmd, *ns;
-	char nspath[PATH_MAX];
-	struct stat ns_stat;
+	const char *cmd, *vrf;
+	char vrfpath[PATH_MAX];
+	struct stat vrf_stat;
 
 	do {
 		c = getopt(argc, argv, "hv");
@@ -325,33 +325,33 @@ int main(int argc, char * const argv[])
 		return 1;
 	}
 	cmd = argv[optind];
-	ns = argv[optind + 1];
+	vrf = argv[optind + 1];
 
-	if (strchr(ns, '/'))
+	if (strchr(vrf, '/'))
 		fprintf(stderr, "%s: namespace names containing slashes "
-				"are not recommended.\n", ns);
-	if (ns[0] == '.')
+				"are not recommended.\n", vrf);
+	if (vrf[0] == '.')
 		fprintf(stderr, "%s: namespace names starting with dots "
-				"are not recommended.\n", ns);
+				"are not recommended.\n", vrf);
 
-	snprintf(nspath, sizeof(nspath), PATH_CFG "/%s", ns);
-	if (stat(nspath, &ns_stat)) {
-		fprintf(stderr, "%s: %s\n", nspath, strerror(errno));
+	snprintf(vrfpath, sizeof(vrfpath), PATH_CFG "/%s", vrf);
+	if (stat(vrfpath, &vrf_stat)) {
+		fprintf(stderr, "%s: %s\n", vrfpath, strerror(errno));
 		return 2;
 	}
-	if (!S_ISDIR(ns_stat.st_mode)) {
-		fprintf(stderr, "%s: not a directory\n", nspath);
+	if (!S_ISDIR(vrf_stat.st_mode)) {
+		fprintf(stderr, "%s: not a directory\n", vrfpath);
 		return 2;
 	}
 
 	if (verbose >= 1)
-		fprintf(stderr, "%s: 0%o %d:%d\n", nspath, ns_stat.st_mode,
-				ns_stat.st_uid, ns_stat.st_gid);
+		fprintf(stderr, "%s: 0%o %d:%d\n", vrfpath, vrf_stat.st_mode,
+				vrf_stat.st_uid, vrf_stat.st_gid);
 
 	if (!strcmp(cmd, "start")) {
-		return do_start(ns);
+		return do_start(vrf);
 	} else if (!strcmp(cmd, "getpid")) {
-		return do_getpid(ns);
+		return do_getpid(vrf);
 	} else {
 		fprintf(stderr, "unknown command '%s'\n", cmd);
 		return 1;

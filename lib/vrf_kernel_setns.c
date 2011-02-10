@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-#include "netns.h"
+#include "vrf.h"
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
@@ -69,11 +69,11 @@ static void leave_netns(int old)
 	}
 }
 
-int netns_socket(const char *netns, int domain, int type, int protocol)
+int vrf_socket(const char *vrf, int domain, int type, int protocol)
 {
 	int fd, old;
 
-	old = enter_netns(netns);
+	old = enter_netns(vrf);
 	if (old == -1)
 		return -1;
 
@@ -83,11 +83,11 @@ int netns_socket(const char *netns, int domain, int type, int protocol)
 	return fd;
 }
 
-int netns_tap(const char *netns)
+int vrf_tap(const char *vrf)
 {
 	int fd, old;
 
-	old = enter_netns(netns);
+	old = enter_netns(vrf);
 	if (old == -1)
 		return -1;
 

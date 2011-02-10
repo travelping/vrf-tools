@@ -22,5 +22,5 @@ gmon.out
 .deps
 .libs
 
-/src/netns
+/src/vrf
 
