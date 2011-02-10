@@ -15,10 +15,13 @@
 /* use defined value */
 #elif defined(__x86_64__)
 #define __NR_setns 300
+#error this code is outdated. update __NR_setns.
 #elif defined(__i386__)
 #define __NR_setns 338
+#error this code is outdated. update __NR_setns.
 #elif defined(__arm__)
 #define __NR_setns 366
+#error this code is outdated. update __NR_setns.
 #else
 #error setns syscall number not known
 #endif
