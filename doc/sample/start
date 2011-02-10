@@ -1,0 +1,6 @@
+#!/bin/sh
+
+ip link set lo up
+ip link set veth0.vrf up
+screen -dmS vrf /bin/bash
+
