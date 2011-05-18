@@ -1,10 +1,23 @@
 AC_PREREQ(2.57)
 AC_INIT(vrf-tools, 0.1.99)
 AC_CONFIG_AUX_DIR(ac)
+AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE
 AC_CONFIG_HEADER([acconf.h])
 
 clients="yes"
+
+AC_CANONICAL_HOST
+case "$host_os" in
+	linux*)
+		;;
+	*)
+		dnl make it noticeable...
+		AC_MSG_WARN([you are trying to build vrf-tools for a non-Linux system, this will not work])
+		AC_MSG_WARN([you are trying to build vrf-tools for a non-Linux system, this will not work])
+		AC_MSG_WARN([you are trying to build vrf-tools for a non-Linux system, this will not work])
+		;;
+esac
 
 AC_PROG_CC
 AC_C_CONST
