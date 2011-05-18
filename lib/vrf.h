@@ -1,3 +1,9 @@
+/* vrf-tools
+ *
+ * Copyright (c) 2009, 2010, 2011 David Lamparter
+ * please refer to the COPYING file for copying permission.
+ */
+
 #ifndef _VRF_H
 #define _VRF_H
 

@@ -1,4 +1,9 @@
 #!/bin/sh
+#
+# vrf-tools
+#
+# Copyright (c) 2009, 2010, 2011 David Lamparter
+# please refer to the COPYING file for copying permission.
 
 ip link set lo up
 ip link set veth0.vrf up
