@@ -1,0 +1,51 @@
+vrf-tools
+
+
+Overview
+========
+
+This package provides a library and some command line utilities
+to work with Linux network namespaces and mend them into "VRFs".
+
+A VRF in this context is a "Virtual Routing and Forwarding"
+instance, compromising a full separate internet router (incl.
+host). The functionality available is determined by the kernel
+version, but Linux kernel support is fairly exhausting.
+
+This package does not work on non-Linux kernels.
+
+Use with kernels older than 2.6.36 is not recommended due to
+various kernel bugs.
+
+
+Features
+========
+
+Features tested and used by the author include:
+ - routing, including policy routing
+ - various netlink protocols
+ - netfilter, including conntrack & NAT
+ - VLANs
+ - TUN/TAP devices
+ - ppp devices
+
+Features tested and found non-working by the author:
+ - traffic shaping (tc / qdiscs / classifiers / etc.)
+   (this was on a 2.6.38 kernel and might be fixed by now)
+
+
+Routing daemons
+===============
+
+Both the quagga and bird routing suites are known to work
+transparently with VRFs created by this package. You will need to
+run multiple instances of all routing daemons currently.
+
+The quagga-dn42 tree provides minimal helpers for working with
+VRFs, no actual features though.
+
+refer to:
+  http://bird.network.cz/
+  http://quagga.net/
+  http://git.spaceboyz.net/equinox/quagga.git/
+

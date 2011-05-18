@@ -1,0 +1,15 @@
+vrf-tools
+
+Mostly Copyright (c) 2009, 2010, 2011 David Lamparter
+	released under simplified 2-clause BSD licence
+
+
+Contributors:
+	David Lamparter <equinox at diac24 dot net>
+		source code (2009, 2010, 2011)
+	Benjamin Kiessling <benjaminkiessling at bttec dot org>
+		man page (2010)
+
+
+Uses the GNU autotools (autoconf, automake, etc.)
+

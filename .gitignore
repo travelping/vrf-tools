@@ -8,6 +8,7 @@
 /acconf.h*
 /stamp-h1
 /ChangeLog
+/INSTALL
 /libtool
 Makefile
 Makefile.in
