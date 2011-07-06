@@ -1,0 +1,372 @@
+From 3a9ae179e60f25d8a4ba319d0cb97f2aaf544cde Mon Sep 17 00:00:00 2001
+From: David Lamparter <david.lamparter@adyton.net>
+Date: Wed, 6 Jul 2011 17:48:22 +0200
+Subject: [PATCH] VRF (routing domains) support through libvrf
+
+this allows OpenVPN to open its data sockets in a different VRF (network
+namespace) than the one it is running in, thereby allowing separation of
+the VPN routing domain from the transport routing domain.
+
+it defers the actual job to libvrf, which currently supports Linux netns
+with unix socket passing as well as setns() and aims to provide an
+OS-agnostic API for VRFs.
+
+From: David Lamparter <david.lamparter@adyton.net>
+Signed-off-by: David Lamparter <equinox@diac24.net>
+---
+ configure.ac |   25 +++++++++++++++++++++++++
+ init.c       |    1 +
+ manage.c     |    4 ++--
+ options.c    |   15 +++++++++++++++
+ options.h    |    3 +++
+ socket.c     |   43 +++++++++++++++++++++++++++----------------
+ socket.h     |    4 +++-
+ 7 files changed, 76 insertions(+), 19 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index a3789d9..e836492 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -187,6 +187,12 @@ AC_ARG_ENABLE(iproute2,
+    test $enableval = "yes" && AC_DEFINE(CONFIG_FEATURE_IPROUTE, 1, [enable iproute2 support])   
+ )
+ 
++AC_ARG_ENABLE(vrf,
++   [  --enable-vrf            Enable support for VRFs],
++   [VRF="$enableval"],
++   [VRF="no"]
++)
++
+ AC_ARG_ENABLE(def-auth,
+    [  --disable-def-auth      Disable deferred authentication],
+    [DEF_AUTH="$enableval"],
+@@ -665,6 +671,25 @@ if test "${WIN32}" = "yes"; then
+ fi
+ 
+ dnl
++dnl check for libvrf library
++dnl
++
++if test "$VRF" = "yes"; then
++   VRF_H=""
++   AC_CHECKING([for vrf Library and Header files])
++   AC_CHECK_HEADER(vrf.h, ,
++     AC_MSG_ERROR([vrf headers were not found])
++   )
++
++   AC_CHECK_LIB(vrf, vrf_socket,
++   [ OPENVPN_ADD_LIBS(-lvrf)
++     AC_DEFINE(ENABLE_VRF, 1, [Use vrf_socket from vrf library])
++   ], [
++     AC_MSG_ERROR([vrf library was not found])
++   ])
++fi
++
++dnl
+ dnl check for LZO library
+ dnl
+ 
+diff --git a/init.c b/init.c
+index 4a16fba..3985115 100644
+--- a/init.c
++++ b/init.c
+@@ -2526,6 +2526,7 @@ do_init_socket_1 (struct context *c, const int mode)
+ 
+   link_socket_init_phase1 (c->c2.link_socket,
+ 			   connection_list_defined (&c->options),
++			   c->options.vrf,
+ 			   c->options.ce.local,
+ 			   c->options.ce.local_port,
+ 			   c->options.ce.remote,
+diff --git a/manage.c b/manage.c
+index ab425e7..3674ba3 100644
+--- a/manage.c
++++ b/manage.c
+@@ -1554,7 +1554,7 @@ man_listen (struct management *man)
+       else
+ #endif
+ 	{
+-	  man->connection.sd_top = create_socket_tcp ();
++	  man->connection.sd_top = create_socket_tcp (NULL);
+ 	  socket_bind (man->connection.sd_top, &man->settings.local, "MANAGEMENT");
+ 	}
+ 
+@@ -1620,7 +1620,7 @@ man_connect (struct management *man)
+   else
+ #endif
+     {
+-      man->connection.sd_cli = create_socket_tcp ();
++      man->connection.sd_cli = create_socket_tcp (NULL);
+       status = openvpn_connect (man->connection.sd_cli,
+ 				&man->settings.local,
+ 				5,
+diff --git a/options.c b/options.c
+index 77e7c7f..6892285 100644
+--- a/options.c
++++ b/options.c
+@@ -86,6 +86,9 @@ const char title_string[] =
+ #ifdef USE_PF_INET6
+   " [PF_INET6]"
+ #endif
++#ifdef ENABLE_VRF
++  " [VRF]"
++#endif
+   " [IPv6 payload 20110522-1 (2.2.0)]"
+   " built on " __DATE__
+ ;
+@@ -105,6 +108,9 @@ static const char usage_message[] =
+   "--remote host [port] : Remote host name or ip address.\n"
+   "--remote-random : If multiple --remote options specified, choose one randomly.\n"
+   "--remote-random-hostname : Add a random string to remote DNS name.\n"
++#ifdef ENABLE_VRF
++  "--vrf vrf       : VRF for tcp/udp sockets.\n"
++#endif
+   "--mode m        : Major mode, m = 'p2p' (default, point-to-point) or 'server'.\n"
+   "--proto p       : Use protocol p for communicating with peer.\n"
+   "                  p = udp (default), tcp-server, or tcp-client\n"
+@@ -720,6 +726,7 @@ init_options (struct options *o, const bool init_gc)
+       o->gc_owned = true;
+     }
+   o->mode = MODE_POINT_TO_POINT;
++  o->vrf = NULL;
+   o->topology = TOP_NET30;
+   o->ce.proto = PROTO_UDPv4;
+   o->ce.connect_retry_seconds = 5;
+@@ -1355,6 +1362,7 @@ show_settings (const struct options *o)
+   SHOW_STR (config);
+   
+   SHOW_INT (mode);
++  SHOW_STR (vrf);
+ 
+ #ifdef TUNSETPERSIST
+   SHOW_BOOL (persist_config);
+@@ -4025,6 +4033,13 @@ add_option (struct options *options,
+ 	  goto err;
+ 	}
+     }
++#ifdef ENABLE_VRF
++  else if (streq (p[0], "vrf") && p[1])
++    {
++      VERIFY_PERMISSION (OPT_P_GENERAL);
++      options->vrf = p[1];
++    }
++#endif
+   else if (streq (p[0], "dev") && p[1])
+     {
+       VERIFY_PERMISSION (OPT_P_GENERAL);
+diff --git a/options.h b/options.h
+index 8a51502..f6f86b4 100644
+--- a/options.h
++++ b/options.h
+@@ -164,6 +164,9 @@ struct options
+ # define MODE_SERVER         1
+   int mode;
+ 
++  /* VRF - for now only one per process */
++  const char *vrf;
++
+   /* enable forward compatibility for post-2.1 features */
+   bool forward_compatible;
+ 
+diff --git a/socket.c b/socket.c
+index 6b855c0..ccb2713 100644
+--- a/socket.c
++++ b/socket.c
+@@ -82,6 +82,12 @@ h_errno_msg(int h_errno_err)
+   return "[unknown h_errno value]";
+ }
+ 
++#ifdef ENABLE_VRF
++#include <vrf.h>
++#else
++#define vrf_socket(ns, dom, type, proto) socket(dom, type, proto)
++#endif
++
+ /*
+  * Translate IP addr or hostname to in_addr_t.
+  * If resolve error, try again for
+@@ -819,11 +825,11 @@ link_socket_update_buffer_sizes (struct link_socket *ls, int rcvbuf, int sndbuf)
+  */
+ 
+ socket_descriptor_t
+-create_socket_tcp (void)
++create_socket_tcp (const char *vrf)
+ {
+   socket_descriptor_t sd;
+ 
+-  if ((sd = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
++  if ((sd = vrf_socket (vrf, PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+     msg (M_SOCKERR, "Cannot create TCP socket");
+ 
+ #ifndef WIN32 /* using SO_REUSEADDR on Windows will cause bind to succeed on port conflicts! */
+@@ -852,11 +858,11 @@ create_socket_tcp (void)
+ }
+ 
+ static socket_descriptor_t
+-create_socket_udp (const unsigned int flags)
++create_socket_udp (const char *vrf, const unsigned int flags)
+ {
+   socket_descriptor_t sd;
+ 
+-  if ((sd = socket (PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
++  if ((sd = vrf_socket (vrf, PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+     msg (M_SOCKERR, "UDP: Cannot create UDP socket");
+ #if ENABLE_IP_PKTINFO
+   else if (flags & SF_USE_IP_PKTINFO)
+@@ -880,11 +886,11 @@ create_socket_udp (const unsigned int flags)
+ 
+ #ifdef USE_PF_INET6
+ static socket_descriptor_t
+-create_socket_udp6 (const unsigned int flags)
++create_socket_udp6 (const char *vrf, const unsigned int flags)
+ {
+   socket_descriptor_t sd;
+ 
+-  if ((sd = socket (PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)
++  if ((sd = vrf_socket (vrf, PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+     msg (M_SOCKERR, "UDP: Cannot create UDP6 socket");
+ #if ENABLE_IP_PKTINFO
+   else if (flags & SF_USE_IP_PKTINFO)
+@@ -899,11 +905,11 @@ create_socket_udp6 (const unsigned int flags)
+ }
+ 
+ static socket_descriptor_t
+-create_socket_tcp6 (void)
++create_socket_tcp6 (const char *vrf)
+ {
+   socket_descriptor_t sd;
+ 
+-  if ((sd = socket (PF_INET6, SOCK_STREAM, IPPROTO_TCP)) < 0)
++  if ((sd = vrf_socket (vrf, PF_INET6, SOCK_STREAM, IPPROTO_TCP)) < 0)
+     msg (M_SOCKERR, "Cannot create TCP6 socket");
+ 
+   /* set SO_REUSEADDR on socket */
+@@ -924,28 +930,28 @@ create_socket (struct link_socket *sock)
+   /* create socket */
+   if (sock->info.proto == PROTO_UDPv4)
+     {
+-      sock->sd = create_socket_udp (sock->sockflags);
++      sock->sd = create_socket_udp (sock->info.vrf, sock->sockflags);
+       sock->sockflags |= SF_GETADDRINFO_DGRAM;
+ 
+ #ifdef ENABLE_SOCKS
+       if (sock->socks_proxy)
+-	sock->ctrl_sd = create_socket_tcp ();
++	sock->ctrl_sd = create_socket_tcp (sock->info.vrf);
+ #endif
+     }
+   else if (sock->info.proto == PROTO_TCPv4_SERVER
+ 	   || sock->info.proto == PROTO_TCPv4_CLIENT)
+     {
+-      sock->sd = create_socket_tcp ();
++      sock->sd = create_socket_tcp (sock->info.vrf);
+     }
+ #ifdef USE_PF_INET6
+   else if (sock->info.proto == PROTO_TCPv6_SERVER
+ 	   || sock->info.proto == PROTO_TCPv6_CLIENT)
+     {
+-      sock->sd = create_socket_tcp6 ();
++      sock->sd = create_socket_tcp6 (sock->info.vrf);
+     }
+   else if (sock->info.proto == PROTO_UDPv6)
+     {
+-      sock->sd = create_socket_udp6 (sock->sockflags);
++      sock->sd = create_socket_udp6 (sock->info.vrf, sock->sockflags);
+       sock->sockflags |= SF_GETADDRINFO_DGRAM;
+     }
+ #endif
+@@ -1219,6 +1225,7 @@ openvpn_connect (socket_descriptor_t sd,
+ 
+ void
+ socket_connect (socket_descriptor_t *sd,
++		const char *vrf,
+                 struct openvpn_sockaddr *local,
+                 bool bind_local,
+ 		struct openvpn_sockaddr *remote,
+@@ -1291,11 +1298,11 @@ socket_connect (socket_descriptor_t *sd,
+       switch(local->addr.sa.sa_family)
+ 	{
+ 	case PF_INET6:
+-	  *sd = create_socket_tcp6 ();
++	  *sd = create_socket_tcp6 (vrf);
+ 	  break;
+ 	case PF_INET:
+ #endif
+-	  *sd = create_socket_tcp ();
++	  *sd = create_socket_tcp (vrf);
+ #ifdef USE_PF_INET6
+ 	  break;
+ 	}
+@@ -1601,6 +1608,7 @@ link_socket_new (void)
+ void
+ link_socket_init_phase1 (struct link_socket *sock,
+ 			 const bool connection_profiles_defined,
++			 const char *vrf,
+ 			 const char *local_host,
+ 			 int local_port,
+ 			 const char *remote_host,
+@@ -1671,6 +1679,7 @@ link_socket_init_phase1 (struct link_socket *sock,
+   sock->info.lsa = lsa;
+   sock->info.ipchange_command = ipchange_command;
+   sock->info.plugins = plugins;
++  sock->info.vrf = vrf;
+ 
+   sock->mode = mode;
+   if (mode == LS_MODE_TCP_ACCEPT_FROM)
+@@ -1893,6 +1902,7 @@ link_socket_init_phase2 (struct link_socket *sock,
+ #endif
+ 	  do {
+ 	    socket_connect (&sock->sd,
++			    sock->info.vrf,
+ 			    &sock->info.lsa->local,
+ 			    sock->bind_local,
+ 			    &sock->info.lsa->actual.dest,
+@@ -1934,7 +1944,7 @@ link_socket_init_phase2 (struct link_socket *sock,
+ 	    if (proxy_retry)
+ 	      {
+ 		openvpn_close_socket (sock->sd);
+-		sock->sd = create_socket_tcp ();
++		sock->sd = create_socket_tcp (sock->info.vrf);
+ 	      }
+ 	  } while (proxy_retry);
+ 	}
+@@ -1942,6 +1952,7 @@ link_socket_init_phase2 (struct link_socket *sock,
+       else if (sock->info.proto == PROTO_UDPv4 && sock->socks_proxy)
+ 	{
+ 	  socket_connect (&sock->ctrl_sd,
++			  sock->info.vrf,
+                           &sock->info.lsa->local,
+                           sock->bind_local,
+ 			  &sock->info.lsa->actual.dest,
+diff --git a/socket.h b/socket.h
+index 33da53c..3b52823 100644
+--- a/socket.h
++++ b/socket.h
+@@ -116,6 +116,7 @@ struct link_socket_info
+   bool remote_float;  
+   int proto;                    /* Protocol (PROTO_x defined below) */
+   int mtu_changed;              /* Set to true when mtu value is changed */
++  const char *vrf;
+ };
+ 
+ /*
+@@ -299,6 +300,7 @@ int openvpn_connect (socket_descriptor_t sd,
+ void
+ link_socket_init_phase1 (struct link_socket *sock,
+ 			 const bool connection_profiles_defined,
++			 const char *vrf,
+ 			 const char *local_host,
+ 			 int local_port,
+ 			 const char *remote_host,
+@@ -431,7 +433,7 @@ bool ip_or_dns_addr_safe (const char *addr, const bool allow_fqdn);
+ bool mac_addr_safe (const char *mac_addr);
+ bool ipv6_addr_safe (const char *ipv6_text_addr);
+ 
+-socket_descriptor_t create_socket_tcp (void);
++socket_descriptor_t create_socket_tcp (const char *vrf);
+ 
+ socket_descriptor_t socket_do_accept (socket_descriptor_t sd,
+ 				      struct link_socket_actual *act,
+-- 
+1.7.4.1
+
