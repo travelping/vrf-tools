@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <limits.h>
+#include <signal.h>
 
 #ifdef __NR_setns
 /* use defined value */
@@ -37,10 +38,11 @@ static int sys_setns(unsigned what, int fd)
 	return syscall(__NR_setns, what, fd);
 }
 
-static int enter_netns(const char *netns)
+static int enter_netns(const char *netns, sigset_t *oldmask)
 {
 	int old, new;
 	char name[PATH_MAX];
+	sigset_t allsigs;
 
 	if (!netns)
 		return -2;
@@ -52,13 +54,20 @@ static int enter_netns(const char *netns)
 		snprintf(name, sizeof(name), "%s/%s/ns", PATH_STATE, netns);
 	}
 
-	new = open(name, O_RDONLY);
-	if (new == -1)
+	sigfillset(&allsigs);
+	if (sigprocmask(SIG_BLOCK, &allsigs, oldmask))
 		return -1;
+
+	new = open(name, O_RDONLY);
+	if (new == -1) {
+		sigprocmask(SIG_SETMASK, oldmask, NULL);
+		return -1;
+	}
 
 	old = open("/proc/self/ns/net", O_RDONLY);
 	if (old == -1) {
 		close(new);
+		sigprocmask(SIG_SETMASK, oldmask, NULL);
 		return -1;
 	}
 
@@ -67,24 +76,26 @@ static int enter_netns(const char *netns)
 	return old;
 }
 
-static void leave_netns(int old)
+static void leave_netns(int old, const sigset_t *oldmask)
 {
 	if (old != -2) {
 		sys_setns(0, old);
 		close(old);
+		sigprocmask(SIG_SETMASK, oldmask, NULL);
 	}
 }
 
 int vrf_socket(const char *vrf, int domain, int type, int protocol)
 {
 	int fd, old;
+	sigset_t oldmask;
 
-	old = enter_netns(vrf);
+	old = enter_netns(vrf, &oldmask);
 	if (old == -1)
 		return -1;
 
 	fd = socket(domain, type, protocol);
-	leave_netns(old);
+	leave_netns(old, &oldmask);
 
 	return fd;
 }
@@ -92,13 +103,14 @@ int vrf_socket(const char *vrf, int domain, int type, int protocol)
 int vrf_tap(const char *vrf)
 {
 	int fd, old;
+	sigset_t oldmask;
 
-	old = enter_netns(vrf);
+	old = enter_netns(vrf, &oldmask);
 	if (old == -1)
 		return -1;
 
 	fd = open("/dev/net/tun", O_RDWR);
-	leave_netns(old);
+	leave_netns(old, &oldmask);
 
 	return fd;
 }
