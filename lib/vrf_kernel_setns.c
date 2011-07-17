@@ -18,25 +18,36 @@
 #include <limits.h>
 #include <signal.h>
 
-#ifdef __NR_setns
-/* use defined value */
-#elif defined(__x86_64__)
-#define __NR_setns 300
-#error this code is outdated. update __NR_setns.
-#elif defined(__i386__)
-#define __NR_setns 338
-#error this code is outdated. update __NR_setns.
-#elif defined(__arm__)
-#define __NR_setns 366
-#error this code is outdated. update __NR_setns.
-#else
-#error setns syscall number not known
+#include "../acconf.h"
+#ifdef HAVE_SCHED_H
+#include <sched.h>
+#endif
+#ifdef HAVE_LINUX_UNISTD_H
+#include <linux/unistd.h>
 #endif
 
-static int sys_setns(unsigned what, int fd)
+#ifndef HAVE_SETNS
+# ifdef __NR_setns
+/* use defined value */
+# else
+#  warning please update your kernel headers, this is a major kludge
+#  if defined(__x86_64__)
+#   define __NR_setns 308
+#  elif defined(__i386__)
+#   define __NR_setns 346
+#  elif defined(__arm__)
+#   define __NR_setns 375
+#   warning assuming ARM EABI for setns() call
+#  else
+#   error setns syscall number not known
+#  endif
+# endif
+
+static int setns(int fd, int nstype)
 {
-	return syscall(__NR_setns, what, fd);
+	return syscall(__NR_setns, fd, nstype);
 }
+#endif /* !HAVE_SETNS */
 
 static int enter_netns(const char *netns, sigset_t *oldmask)
 {
@@ -71,7 +82,7 @@ static int enter_netns(const char *netns, sigset_t *oldmask)
 		return -1;
 	}
 
-	sys_setns(0, new);
+	setns(new, CLONE_NEWNET);
 	close(new);
 	return old;
 }
@@ -79,7 +90,7 @@ static int enter_netns(const char *netns, sigset_t *oldmask)
 static void leave_netns(int old, const sigset_t *oldmask)
 {
 	if (old != -2) {
-		sys_setns(0, old);
+		setns(old, CLONE_NEWNET);
 		close(old);
 		sigprocmask(SIG_SETMASK, oldmask, NULL);
 	}

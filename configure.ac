@@ -56,6 +56,7 @@ AC_CHECK_HEADERS([linux/unistd.h],[
 AC_CHECK_FUNCS([clone unshare],, [
 	AC_MSG_WARN([no clone/unshare, this will not work])
 ])
+AC_CHECK_FUNCS([setns], [], [])
 
 AC_CHECK_DECLS([CLONE_NEWNET],,, [[
 #define _GNU_SOURCE

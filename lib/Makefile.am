@@ -3,6 +3,6 @@ AM_CFLAGS = -I..
 
 include_HEADERS = vrf.h
 lib_LTLIBRARIES = libvrf.la
-libvrf_la_SOURCES = vrf_fdpass.c
-EXTRA_DIST = vrf_dummy.c vrf_kernel_setns.c
+libvrf_la_SOURCES = vrf_kernel_setns.c
+EXTRA_DIST = vrf_dummy.c vrf_fdpass.c
 
