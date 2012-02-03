@@ -131,6 +131,7 @@ static int do_start_child(const char *vrf, int notifier, int waiter)
 
 	char exe[256], argv0[256], *args[] = { argv0, NULL };
 
+	struct sigaction sa;
 	int sig;
 	sigset_t set;
 
@@ -188,6 +189,11 @@ static int do_start_child(const char *vrf, int notifier, int waiter)
 	close(0);
 	close(1);
 	close(2);
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = SIG_IGN;
+	sa.sa_flags = SA_NOCLDWAIT;
+	sigaction(SIGCHLD, &sa, NULL);
 
 	ctl_run(ctlsock);
 
