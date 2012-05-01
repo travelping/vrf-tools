@@ -71,10 +71,16 @@ ${sched_h}
 ${linux_unistd_h}
 ]])
 
-AC_OUTPUT([
+CONFDATE=`date '+%Y%m%d'`
+AC_SUBST(CONFDATE)
+
+AC_CONFIG_FILES([
 	Makefile
 	src/Makefile
 	lib/Makefile
 	doc/Makefile
+	rpm/Makefile
+	rpm/vrf-tools.spec
 ])
 
+AC_OUTPUT

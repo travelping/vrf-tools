@@ -1,0 +1,80 @@
+#release sub-revision (the two digits after the CONFDATE)
+%{!?release_rev:        %define         release_rev     01 }
+
+Summary: Linux network namespace and Virtual Routing and Forwarding (VRF) tools
+Name: 		vrf-tools
+Version: 	@VERSION@
+Release: 	@CONFDATE@%{release_rev}
+License: 	BSD
+Group:		System/Libraries
+URL:		http://git.spaceboyz.net/equinox/vrf-tools.git/
+Source0:	%{name}-%{version}.tar.gz
+BuildRoot:	%{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+#Requires:	%{name}-libs = %{version}-%{release}
+BuildRequires:	autoconf automake libtool
+
+%description
+This package provides a library and some command line utilities
+to work with Linux network namespaces and mend them into "VRFs".
+
+A VRF in this context is a "Virtual Routing and Forwarding"
+instance, compromising a full separate internet router (incl.
+host). The functionality available is determined by the kernel
+version, but Linux kernel support is fairly exhausting.
+
+Use with kernels older than 2.6.36 is not recommended due to
+various kernel bugs.
+
+Features tested and used by the author include:
+ - routing, including policy routing
+ - various netlink protocols
+ - netfilter, including conntrack & NAT
+ - VLANs
+ - TUN/TAP devices
+ - ppp devices
+
+Features tested and found non-working by the author:
+ - traffic shaping (tc / qdiscs / classifiers / etc.)
+   (this was on a 2.6.38 kernel and might be fixed by now)
+
+%package devel
+Summary: Header and object files for Linux VRF library
+Group: Development/System
+Requires: %{name} = %{version}-%{release}
+%description devel
+The %{name}-devel package contains the headers and object files necessary
+for developing against the Linux VRF library.
+
+%prep
+%setup
+
+%build
+# dist tarball wont have autogen.sh, but will have configure
+# git has autogen.sh, but not configure.
+if [ ! -f ./configure ] ; then
+  ./autogen.sh
+fi
+%configure
+make
+
+%install
+make install DESTDIR=$RPM_BUILD_ROOT
+rm $RPM_BUILD_ROOT%{_libdir}/*.a
+rm $RPM_BUILD_ROOT%{_libdir}/*.la
+
+
+%files
+%defattr(-,root,root)
+%doc AUTHORS COPYING ChangeLog README NEWS doc/sample/*
+%{_mandir}/man*/*
+%dir %{_libdir}
+%{_libdir}/*.so*
+%{_bindir}/*
+
+%files devel
+%defattr(-,root,root)
+%doc AUTHORS COPYING
+%dir %{_libdir}
+%{_libdir}/*.so
+%dir %{_includedir}
+%{_includedir}/*.h

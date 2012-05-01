@@ -10,6 +10,7 @@
 /ChangeLog
 /INSTALL
 /libtool
+/rpm/vrf-tools.spec
 Makefile
 Makefile.in
 gmon.out

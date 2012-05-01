@@ -1,0 +1,7 @@
+This directory allows you to build RPMs from tarballs of vrf-tools. E.g.,
+presuming the version is 0.1.99:
+
+ make dist && rpmbuild -tb vrf-tools-0.1.99.tar.gz
+
+Will create RPMs in whereever you have setup your rpm build environment
+directory.
