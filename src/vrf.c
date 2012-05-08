@@ -129,7 +129,7 @@ static int do_start_child(const char *vrf, int notifier, int waiter)
 	int ok = 0, rv, ctlsock;
 	struct pollfd p;
 
-	char exe[256], argv0[256], *args[] = { argv0, NULL };
+	char spid[10], exe[256], argv0[256], *args[] = { argv0, NULL };
 
 	int sig;
 	sigset_t set;
@@ -169,6 +169,10 @@ static int do_start_child(const char *vrf, int notifier, int waiter)
 	close(waiter);
 
 	setsid();
+
+	snprintf(spid, sizeof(spid), "%ld", (long) getpid());
+	setenv("VRF_PID", spid, 1);
+	setenv("VRF_NAME", vrf, 1);
 
 	snprintf(argv0, sizeof(argv0), "vrf: %s", vrf);
 	snprintf(exe, sizeof(exe), PATH_CFG "/%s/start", vrf);
