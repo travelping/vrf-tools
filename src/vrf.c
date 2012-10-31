@@ -124,6 +124,13 @@ static int writepid(const char *vrf)
 	return 0;
 }
 
+static void sigchld(int sig)
+{
+	int status;
+	while (waitpid(-1, &status, WNOHANG) > 0)
+		;
+}
+
 static int do_start_child(const char *vrf, int notifier, int waiter)
 {
 	int ok = 0, rv, ctlsock;
@@ -192,6 +199,9 @@ static int do_start_child(const char *vrf, int notifier, int waiter)
 	close(0);
 	close(1);
 	close(2);
+
+	signal(SIGCHLD, sigchld);
+	sigchld(SIGCHLD);
 
 	ctl_run(ctlsock);
 
