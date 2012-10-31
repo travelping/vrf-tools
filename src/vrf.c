@@ -18,6 +18,7 @@
 #include <sys/poll.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -158,6 +159,11 @@ static int do_start_child(const char *vrf, int notifier, int waiter)
 	}
 	if (verbose >= 1)
 		fprintf(stderr, "%s: pid %ld\n", vrf, (long)getpid());
+
+#ifndef PR_SET_CHILD_SUBREAPER
+#define PR_SET_CHILD_SUBREAPER 36
+#endif
+	prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0);
 
 	safe_write(notifier, &ok, sizeof(ok));
 
